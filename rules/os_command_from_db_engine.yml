@@ -1,0 +1,51 @@
+# Rover Observatory — database activity rule
+# One rule per file. Filename must match stable_key.
+stable_key: os_command_from_db_engine
+name: OS command execution from database engine
+description: Detects the database engine being used to run operating-system commands or write files.
+class: security
+category: Exfiltration
+origin: rover_default
+severity: critical
+enabled: true
+
+scope:
+  type: source
+  key: source:mssql-payments-03
+  platform: mssql
+  source_name: MSSQL-PAYMENTS-03
+
+schedule:
+  run_frequency_s: 60
+  time_range_s: 300
+  dedupe_window_s: 1800
+  lookback_grace_s: 60
+
+mitre:
+  tactics:
+    - Execution
+    - Exfiltration
+  techniques:
+    - T1059.003
+    - T1048
+
+frameworks:
+  - PCI DSS 2.2.5
+
+query: |
+  source = 'dam_audit'
+    and statement matches '(?i)xp_cmdshell|sp_OACreate|bcp\s+.*queryout|copy\s+.*\bprogram\b|utl_file\.'
+
+rationale: >-
+  An OS-level write initiated inside the database bypasses every application
+  and network control in front of it. These procedures are disabled by policy
+  on production estates.
+
+response:
+  channel: "#db-ops"
+  first_step: >-
+    Disable the procedure and restart the instance, quarantine the destination
+    path, capture any file written, then rotate the invoking principal's
+    credential.
+
+# Fires as DAM-2036 in the Rover Observatory alert inbox.

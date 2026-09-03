@@ -1,0 +1,53 @@
+# Rover Observatory — database activity rule
+# One rule per file. Filename must match stable_key.
+stable_key: pan_projection_without_predicate
+name: PAN column projection without predicate
+description: Detects an unbounded projection of PAN, expiry or CVV columns from the cardholder vault.
+class: security
+category: Exfiltration
+origin: rover_default
+severity: medium
+enabled: true
+
+scope:
+  type: source
+  key: source:db2-cards-zos
+  platform: db2_zos
+  source_name: DB2-CARDS-ZOS
+
+schedule:
+  run_frequency_s: 300
+  time_range_s: 900
+  dedupe_window_s: 3600
+  lookback_grace_s: 60
+
+mitre:
+  tactics:
+    - Collection
+  techniques:
+    - T1005
+
+frameworks:
+  - PCI DSS 3.4
+  - PCI DSS 10.2.1
+
+query: |
+  source = 'dam_audit' and action = 'SELECT'
+    and object matches 'card_pan_vault|pan_vault'
+    and statement matches '(?i)\b(pan|cvv_hash|expiry)\b'
+    and statement not matches '(?i)\swhere\s'
+    and rows > 10000
+
+rationale: >-
+  A projection of PAN columns with no predicate and no row limit returns the
+  whole vault. Legitimate reporting against this table is always scoped to an
+  account or a date range.
+
+response:
+  channel: "#db-ops"
+  first_step: >-
+    Confirm whether the principal has an approved reporting job against the
+    vault. If not, revoke SELECT and treat the returned row count as the
+    exposure scope.
+
+# Fires as DAM-2041 in the Rover Observatory alert inbox.

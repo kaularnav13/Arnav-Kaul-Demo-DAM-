@@ -1,0 +1,51 @@
+# Rover Observatory — database activity rule
+# One rule per file. Filename must match stable_key.
+stable_key: write_by_readonly_principal
+name: Write by principal with read-only entitlement
+description: Detects DML issued by a principal provisioned read-only by entitlement policy.
+class: security
+category: Privilege
+origin: rover_default
+severity: high
+enabled: true
+
+scope:
+  type: source
+  key: source:orcl-core-01
+  platform: oracle
+  source_name: ORCL-CORE-01
+
+schedule:
+  run_frequency_s: 300
+  time_range_s: 900
+  dedupe_window_s: 3600
+  lookback_grace_s: 120
+
+mitre:
+  tactics:
+    - Impact
+  techniques:
+    - T1565.001
+
+frameworks:
+  - SOX
+  - Segregation of duties
+
+query: |
+  source = 'dam_audit'
+    and action in ('INSERT', 'UPDATE', 'DELETE', 'MERGE')
+    and user matches '_ro$|^bi_reporting'
+
+rationale: >-
+  A write from a read-only principal is either a mis-provisioned grant or a
+  compromised credential. Either way the ledger changed outside the
+  application that owns it.
+
+response:
+  channel: "#db-ops"
+  first_step: >-
+    Capture the before/after values for the affected rows, confirm the grant
+    that permitted the write, and reconcile the balances against the core
+    banking application.
+
+# Fires as DAM-2033 in the Rover Observatory alert inbox.

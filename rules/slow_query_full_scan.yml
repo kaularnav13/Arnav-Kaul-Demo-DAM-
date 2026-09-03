@@ -1,0 +1,45 @@
+# Rover Observatory — database activity rule
+# One rule per file. Filename must match stable_key.
+stable_key: slow_query_full_scan
+name: Statement runtime > 10s, full table scan
+description: Detects long-running statements forced into a full scan by an unindexable predicate.
+class: operational
+category: Availability
+origin: rover_default
+severity: medium
+enabled: true
+
+scope:
+  type: source
+  key: source:orcl-core-01
+  platform: any
+  source_name: ORCL-CORE-01
+
+schedule:
+  run_frequency_s: 300
+  time_range_s: 3600
+  dedupe_window_s: 3600
+  lookback_grace_s: 120
+
+# class: operational — MITRE ATT&CK does not model availability failures.
+mitre: null
+
+frameworks: []
+
+query: |
+  source = 'dam_audit'
+    and duration_s > 10
+    and statement matches "(?i)like\\s+'%"
+
+rationale: >-
+  A leading-wildcard LIKE cannot use an index. On a joined ledger query it
+  scans the whole table every time the report runs, and it recurs on a
+  schedule.
+
+response:
+  channel: "#db-ops"
+  first_step: >-
+    Rewrite the predicate or add a full-text index. If the report is not time
+    critical, move it off the primary.
+
+# Fires as DAM-2011 in the Rover Observatory alert inbox.

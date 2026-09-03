@@ -1,0 +1,50 @@
+# Rover Observatory — database activity rule
+# One rule per file. Filename must match stable_key.
+stable_key: failed_auth_burst
+name: Failed authentication burst
+description: Detects repeated invalid-credential attempts against a production instance from one principal.
+class: security
+category: Access
+origin: rover_default
+severity: high
+enabled: true
+
+scope:
+  type: source
+  key: source:orcl-core-01
+  platform: oracle
+  source_name: ORCL-CORE-01
+
+schedule:
+  run_frequency_s: 60
+  time_range_s: 300
+  dedupe_window_s: 900
+  lookback_grace_s: 60
+
+mitre:
+  tactics:
+    - Credential Access
+  techniques:
+    - T1110
+
+frameworks:
+  - PCI DSS 8.1.6
+
+query: |
+  source = 'dam_audit' and action = 'CONNECT' and status = 'failed'
+    | stats count by user, host, src_ip
+    | where count >= 4
+
+rationale: >-
+  Four failures in seconds is not a mistyped password. On a production core
+  instance it is either a credential-stuffing attempt or a stale service
+  configuration hammering the listener.
+
+response:
+  channel: "#db-ops"
+  first_step: >-
+    Lock the account, confirm whether the source address is in the principal's
+    normal range, and check for a successful login from the same address after
+    the burst.
+
+# Fires as DAM-2024 in the Rover Observatory alert inbox.

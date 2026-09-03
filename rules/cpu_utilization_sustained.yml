@@ -1,0 +1,44 @@
+# Rover Observatory — database activity rule
+# One rule per file. Filename must match stable_key.
+stable_key: cpu_utilization_sustained
+name: CPU utilization > 90%
+description: Detects sustained CPU saturation on a monitored database instance.
+class: operational
+category: Availability
+origin: rover_default
+severity: high
+enabled: true
+
+scope:
+  type: source
+  key: source:orcl-core-01
+  platform: any
+  source_name: ORCL-CORE-01
+
+schedule:
+  run_frequency_s: 60
+  time_range_s: 600
+  dedupe_window_s: 1800
+  lookback_grace_s: 60
+
+# class: operational — MITRE ATT&CK does not model availability failures.
+mitre: null
+
+frameworks: []
+
+query: |
+  source = 'dam_metrics' and metric = 'cpu.busy_pct'
+    | stats avg(value) as busy by host
+    | where busy > 90
+
+rationale: >-
+  Above 90% query latency climbs non-linearly and connection queuing begins.
+  The instance has no headroom left to absorb a spike.
+
+response:
+  channel: "#db-ops"
+  first_step: >-
+    Identify the top consuming session, decide whether to kill it or let the
+    window finish, and check whether the workload has outgrown the instance.
+
+# Fires as DAM-2017 in the Rover Observatory alert inbox.

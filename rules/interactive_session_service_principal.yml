@@ -1,0 +1,49 @@
+# Rover Observatory — database activity rule
+# One rule per file. Filename must match stable_key.
+stable_key: interactive_session_service_principal
+name: Interactive session by service principal
+description: Detects a shared service credential opening an interactive client session.
+class: security
+category: Access
+origin: rover_default
+severity: medium
+enabled: true
+
+scope:
+  type: source
+  key: source:orcl-core-01
+  platform: oracle
+  source_name: ORCL-CORE-01
+
+schedule:
+  run_frequency_s: 300
+  time_range_s: 900
+  dedupe_window_s: 3600
+  lookback_grace_s: 120
+
+mitre:
+  tactics:
+    - Defense Evasion
+  techniques:
+    - T1078.003
+
+frameworks:
+  - PCI DSS 8.2
+  - PCI DSS 8.3
+
+query: |
+  source = 'dam_audit' and action = 'CONNECT'
+    and user matches '^svc_'
+    and app matches '(?i)sql developer|ssms|management studio|dbeaver|datagrip|toad|pgadmin|psql|sqlcmd'
+
+rationale: >-
+  Service credentials are shared and unattributable. Used interactively,
+  nothing in the audit trail can say which person ran the statement.
+
+response:
+  channel: "#db-ops"
+  first_step: >-
+    Identify the operator from the source workstation, move them to a named
+    account, and remove interactive login from the service principal.
+
+# Fires as DAM-2022 in the Rover Observatory alert inbox.

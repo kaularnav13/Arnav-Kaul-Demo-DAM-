@@ -1,0 +1,49 @@
+# Rover Observatory — database activity rule
+# One rule per file. Filename must match stable_key.
+stable_key: dcl_on_cardholder_object
+name: DCL on cardholder object outside change window
+description: Detects GRANT or REVOKE against cardholder and payment objects with no approved change record.
+class: security
+category: Privilege
+origin: rover_default
+severity: high
+enabled: true
+
+scope:
+  type: source
+  key: source:orcl-core-01
+  platform: oracle
+  source_name: ORCL-CORE-01
+
+schedule:
+  run_frequency_s: 300
+  time_range_s: 3600
+  dedupe_window_s: 3600
+  lookback_grace_s: 120
+
+mitre:
+  tactics:
+    - Persistence
+  techniques:
+    - T1098
+
+frameworks:
+  - PCI DSS 7.1
+  - SOX
+
+query: |
+  source = 'dam_audit' and kind = 'DCL'
+    and object matches 'card_pan_vault|pan_vault|wire_transfer|swift'
+    and not change_window
+
+rationale: >-
+  Standing access to PAN data widens silently. A grant made outside a change
+  record has no approval trail and no scheduled review.
+
+response:
+  channel: "#db-ops"
+  first_step: >-
+    Revoke the grant unless a change ticket covers it, then re-run the
+    entitlement review for every principal holding SELECT on the object.
+
+# Fires as DAM-2031 in the Rover Observatory alert inbox.

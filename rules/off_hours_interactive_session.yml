@@ -1,0 +1,48 @@
+# Rover Observatory — database activity rule
+# One rule per file. Filename must match stable_key.
+stable_key: off_hours_interactive_session
+name: Interactive session outside business hours
+description: Detects interactive database sessions opened outside the working window.
+class: security
+category: Access
+origin: rover_default
+severity: low
+enabled: true
+
+scope:
+  type: source
+  key: source:pg-openbank-02
+  platform: postgres
+  source_name: PG-OPENBANK-02
+
+schedule:
+  run_frequency_s: 900
+  time_range_s: 3600
+  dedupe_window_s: 21600
+  lookback_grace_s: 300
+
+mitre:
+  tactics:
+    - Defense Evasion
+  techniques:
+    - T1078
+
+frameworks: []
+
+query: |
+  source = 'dam_audit' and action = 'CONNECT'
+    and app matches '(?i)psql|sql developer|ssms|dbeaver|toad|pgadmin'
+    and hour(ts) not in 7..20
+
+rationale: >-
+  Off-hours access is not wrong by itself — it is context. Paired with an
+  incident bridge it is expected; without one it is the first thing to ask
+  about.
+
+response:
+  channel: "#db-ops"
+  first_step: >-
+    Match the session against the on-call schedule and any open incident.
+    Close as expected if it matches, escalate if it does not.
+
+# Fires as DAM-2008 in the Rover Observatory alert inbox.

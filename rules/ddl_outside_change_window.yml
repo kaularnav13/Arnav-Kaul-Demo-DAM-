@@ -1,0 +1,50 @@
+# Rover Observatory — database activity rule
+# One rule per file. Filename must match stable_key.
+stable_key: ddl_outside_change_window
+name: Schema change on SOX in-scope object
+description: Detects DDL against SOX in-scope objects applied outside the approved change window.
+class: security
+category: Schema
+origin: rover_default
+severity: medium
+enabled: true
+
+scope:
+  type: source
+  key: source:pg-openbank-02
+  platform: postgres
+  source_name: PG-OPENBANK-02
+
+schedule:
+  run_frequency_s: 300
+  time_range_s: 3600
+  dedupe_window_s: 3600
+  lookback_grace_s: 120
+
+mitre:
+  tactics:
+    - Impact
+  techniques:
+    - T1565.001
+
+frameworks:
+  - SOX ITGC
+
+query: |
+  source = 'dam_audit' and kind = 'DDL'
+    and object in ('txn_ledger', 'customer_master', 'account_balance', 'gl_journal')
+    and not change_window
+
+rationale: >-
+  In-scope schema must move through the migration pipeline. An interactive
+  ALTER leaves production and the migration history disagreeing about the
+  shape of the table.
+
+response:
+  channel: "#db-ops"
+  first_step: >-
+    Confirm the change against the migration branch. If it is not there,
+    reverse it and re-apply through the pipeline so the history stays
+    authoritative.
+
+# Fires as DAM-2029 in the Rover Observatory alert inbox.

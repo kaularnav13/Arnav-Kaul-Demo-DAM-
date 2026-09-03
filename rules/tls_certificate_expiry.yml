@@ -1,0 +1,46 @@
+# Rover Observatory — database activity rule
+# One rule per file. Filename must match stable_key.
+stable_key: tls_certificate_expiry
+name: TLS certificate < 14 days to expiry
+description: Detects an endpoint certificate approaching expiry with no renewal staged.
+class: operational
+category: Compliance
+origin: rover_default
+severity: high
+enabled: true
+
+scope:
+  type: source
+  key: source:pay-gw
+  platform: any
+  source_name: pay-gw.northwind.example
+
+schedule:
+  run_frequency_s: 3600
+  time_range_s: 86400
+  dedupe_window_s: 86400
+  lookback_grace_s: 600
+
+# class: operational — MITRE ATT&CK does not model availability failures.
+mitre: null
+
+frameworks:
+  - PCI DSS 4.1
+
+query: |
+  source = 'dam_metrics' and metric = 'tls.days_to_expiry'
+    | stats min(value) as days by endpoint
+    | where days < 14
+
+rationale: >-
+  Once the certificate expires, every client that enforces chain verification
+  refuses to connect. On a payment gateway that is a full outage, not a
+  degradation.
+
+response:
+  channel: "#db-ops"
+  first_step: >-
+    Stage the renewal and confirm the full chain, including intermediates,
+    before the cutover window.
+
+# Fires as DAM-2014 in the Rover Observatory alert inbox.

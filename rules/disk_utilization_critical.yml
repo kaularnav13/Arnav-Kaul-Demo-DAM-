@@ -1,0 +1,44 @@
+# Rover Observatory — database activity rule
+# One rule per file. Filename must match stable_key.
+stable_key: disk_utilization_critical
+name: Disk utilization > 95%
+description: Detects a data volume approaching exhaustion, with days of headroom at current growth.
+class: operational
+category: Availability
+origin: rover_default
+severity: medium
+enabled: true
+
+scope:
+  type: source
+  key: source:mongo-kyc-01
+  platform: any
+  source_name: MONGO-KYC-01
+
+schedule:
+  run_frequency_s: 900
+  time_range_s: 3600
+  dedupe_window_s: 21600
+  lookback_grace_s: 300
+
+# class: operational — MITRE ATT&CK does not model availability failures.
+mitre: null
+
+frameworks: []
+
+query: |
+  source = 'dam_metrics' and metric = 'disk.used_pct'
+    | stats max(value) as used by host, volume
+    | where used > 95
+
+rationale: >-
+  A full volume stops writes and can halt the instance. The alert is worth
+  raising days early because adding storage is rarely a same-hour change.
+
+response:
+  channel: "#db-ops"
+  first_step: >-
+    Extend the volume or archive the largest growing collection. Re-check the
+    growth rate afterwards so the forecast reflects the new floor.
+
+# Fires as DAM-2019 in the Rover Observatory alert inbox.

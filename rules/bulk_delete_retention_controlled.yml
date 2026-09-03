@@ -1,0 +1,50 @@
+# Rover Observatory — database activity rule
+# One rule per file. Filename must match stable_key.
+stable_key: bulk_delete_retention_controlled
+name: Bulk delete on retention-controlled collection
+description: Detects mass deletion from collections held under a regulatory retention floor.
+class: security
+category: Compliance
+origin: rover_default
+severity: medium
+enabled: true
+
+scope:
+  type: source
+  key: source:mongo-kyc-01
+  platform: mongodb
+  source_name: MONGO-KYC-01
+
+schedule:
+  run_frequency_s: 300
+  time_range_s: 900
+  dedupe_window_s: 3600
+  lookback_grace_s: 120
+
+mitre:
+  tactics:
+    - Impact
+  techniques:
+    - T1485
+
+frameworks:
+  - Retention policy
+  - Financial crime
+
+query: |
+  source = 'dam_audit' and action = 'DELETE'
+    and object matches 'aml_watchlist_hit|kyc_|sar_'
+    and rows > 500
+
+rationale: >-
+  Watchlist and KYC records carry a statutory retention floor. A bulk delete
+  with no archival export recorded first destroys evidence the firm is
+  required to hold.
+
+response:
+  channel: "#db-ops"
+  first_step: >-
+    Halt the batch, establish whether an archival export preceded the delete,
+    and restore from the point-in-time backup if it did not.
+
+# Fires as DAM-2027 in the Rover Observatory alert inbox.

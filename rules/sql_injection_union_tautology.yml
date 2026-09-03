@@ -1,0 +1,51 @@
+# Rover Observatory — database activity rule
+# One rule per file. Filename must match stable_key.
+stable_key: sql_injection_union_tautology
+name: UNION / tautology in application statement
+description: Detects injection markers reaching the database inside a statement issued by an application principal.
+class: security
+category: Access
+origin: rover_default
+severity: critical
+enabled: true
+
+scope:
+  type: source
+  key: source:pg-openbank-02
+  platform: postgres
+  source_name: PG-OPENBANK-02
+
+schedule:
+  run_frequency_s: 60
+  time_range_s: 300
+  dedupe_window_s: 900
+  lookback_grace_s: 60
+
+mitre:
+  tactics:
+    - Initial Access
+  techniques:
+    - T1190
+
+frameworks:
+  - OWASP A03
+  - PCI DSS 6.5.1
+
+query: |
+  source = 'dam_audit'
+    and user matches '_api$|^app_'
+    and statement matches '(?i)union\s+select|\bor\s+1\s*=\s*1\b|;\s*(drop|shutdown)\b|--\s*$'
+
+rationale: >-
+  Application principals issue a fixed set of parameterised statements. A
+  UNION, a tautology or a trailing comment in that traffic means user input is
+  concatenating into SQL.
+
+response:
+  channel: "#db-ops"
+  first_step: >-
+    Block the source address at the WAF, then rotate every credential in any
+    table the injected statement projected. Patch the endpoint to
+    parameterised queries before re-enabling.
+
+# Fires as DAM-2039 in the Rover Observatory alert inbox.
