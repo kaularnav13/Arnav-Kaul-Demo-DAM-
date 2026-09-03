@@ -1,0 +1,36 @@
+# Rover Observatory — detection rule
+# One rule per file. Filename must match stable_key.
+stable_key: aws_root_login
+name: AWS root account login
+description: Detects successful root account console login activity.
+origin: rover_default
+severity: critical
+enabled: true
+
+scope:
+  type: source
+  key: source:connector-cloudtrail
+  source_pack_key: aws_cloudtrail
+  source_name: Production CloudTrail
+
+schedule:
+  run_frequency_s: 300
+  time_range_s: 3600
+  dedupe_window_s: 3600
+  lookback_grace_s: 120
+
+mitre:
+  tactics:
+    - Initial Access
+    - Privilege Escalation
+  techniques:
+    - T1078
+
+query: |
+  source = 'aws_cloudtrail' and userIdentity.type = 'Root'
+
+response:
+  channel: "#db-ops"
+  first_step: >-
+    Confirm the login against the change calendar. If unplanned, rotate the root
+    credentials and revoke active root sessions before further triage.
